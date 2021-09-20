@@ -9,6 +9,7 @@ module.exports = {
       regex: /[\s\S]+/
     }
   ],
+  onDemandOnly: true,
   defaultColor: 'light-gray',
   logging: { level: 'info' },
   block: {
