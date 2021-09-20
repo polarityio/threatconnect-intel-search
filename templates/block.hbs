@@ -1,0 +1,21 @@
+<h1 class="p-title">{{fa-icon icon="info-circle" fixedWidth=true}} Information</h1>
+<div>
+  <span class="p-key">Query: </span>
+  <span class="p-value red-text">{{block.data.details.args.query}}</span>
+</div>
+{{#if block.data.details.origin}}
+  <div>
+    <span class="p-key">Origin: </span>
+    <span class="p-value">{{block.data.details.origin}}</span>
+  </div>
+{{/if}}
+<div>
+  <span class="p-key">Url: </span>
+  <span class="p-value">
+    <a class="p-link" href="{{block.data.details.url}}">{{block.data.details.url}}</a>
+  </span>
+</div>
+<div>
+  <span class="p-key">Accept Header: </span>
+  <span class="p-value">{{block.data.details.headers.Accept}}</span>
+</div>
