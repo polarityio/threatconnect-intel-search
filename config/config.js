@@ -4,14 +4,14 @@ module.exports = {
   description: 'This is a training integration',
   entityTypes: ['ipv4'],
   logging: { level: 'trace' },
-  block: {
-    component: {
-      file: './components/block.js'
-    },
-    template: {
-      file: './templates/block.hbs'
-    }
-  },
+  // block: {
+  //   component: {
+  //     file: './components/block.js'
+  //   },
+  //   template: {
+  //     file: './templates/block.hbs'
+  //   }
+  // },
   styles: ['./styles/styles.less'],
   options: [
     {

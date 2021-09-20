@@ -5,6 +5,9 @@ const fs = require('fs');
 
 let Logger;
 let requestWithDefaults;
+const MAX_LOOKBACK_DAYS = 360;
+const blockedOwners = [];
+const allowedOwners = [];
 
 function startup(logger) {
   Logger = logger;
@@ -44,32 +47,12 @@ function doLookup(entities, options, cb) {
   async.each(
     entities,
     (entity, done) => {
-      const requestOptions = {
-        uri: 'https://httpbin.org/get',
-        json: true,
-        qs: {
-          query: entity.value,
-          apiKey: options.apiKey
-        }
-      };
-
-      request(requestOptions, (err, response, body) => {
+      getThreatConnectOwners(entity, options, (err, results) => {
         if (err) {
           return done(err);
         }
-
-        if (response.statusCode === 200) {
-          lookupResults.push({
-            entity,
-            data: {
-              summary: [body.origin],
-              details: body
-            }
-          });
-          done();
-        } else {
-          done(`Unexpected HTTP status code ${response.statusCode}`);
-        }
+        lookupResults.push(results);
+        done();
       });
     },
     (err) => {
@@ -80,25 +63,29 @@ function doLookup(entities, options, cb) {
 
 // Retreives all owners from ThreatConnect
 // https://docs.threatconnect.com/en/latest/rest_api/owners/owners.html#retrieving-multiple-owners
-function getThreatConnectOwners() {
+function getThreatConnectOwners(entity, options, cb) {
   request(
     {
-      uri: baseUrl + '/api/v2/owners',
+      uri: options.url + '/api/v2/owners',
       method: 'GET',
-      headers: getHeaders('/api/v2/owners', 'GET'),
+      headers: getHeaders('/api/v2/owners', 'GET', options),
       json: true
     },
     function (err, response, body) {
-      Logger.trace('Returned owners from ThreatConnect\n');
-      Logger.trace(body.data.owner);
-      parseThreatConnectOwners(body.data.owner);
+      if (err) {
+        return cb(err);
+      }
+      Logger.trace({ body }, 'getThreatConnectOwners');
+      parseThreatConnectOwners(entity, body.data.owner, options, cb);
     }
   );
 }
 
 // Filters out owners based on allow/block list. Used to help reduce client side cycles or low fidelity data.
-function parseThreatConnectOwners(owners) {
+function parseThreatConnectOwners(entity, owners, options, cb) {
   let validOwners = [];
+  const ownerResults = [];
+
   if (allowedOwners.length > 0) {
     Logger.trace({ allowedOwners }, 'Filtering on allowed owners');
     validOwners = owners.filter(function (owner) {
@@ -114,9 +101,22 @@ function parseThreatConnectOwners(owners) {
     validOwners = owners;
   }
   Logger.trace({ validOwners }, 'Valid Owners');
-  async.each(validOwners, function (owner) {
-    retrieveThreatConnectGroupObjects(owner);
-  });
+
+  async.each(
+    validOwners,
+    function (owner, done) {
+      retrieveThreatConnectGroupObjects(entity, owner, options, (err, ownerResult) => {
+        if (err) {
+          return done(err);
+        }
+        ownerResults.push(ownerResult);
+        done();
+      });
+    },
+    (err) => {
+      cb(err, ownerResults);
+    }
+  );
 }
 
 // All groups are returned because TC does not support the necessary server side filtering for this use case. They only support name "starts with" or name "is", not "contains".
@@ -128,36 +128,45 @@ function parseThreatConnectOwners(owners) {
 // https://docs.threatconnect.com/en/latest/rest_api/overview.html#specifying-an-owner
 // Result limit is capped at 10,000
 // https://docs.threatconnect.com/en/latest/rest_api/overview.html#pagination
-function retrieveThreatConnectGroupObjects(owner) {
+function retrieveThreatConnectGroupObjects(entity, owner, options, cb) {
   const encodedOwner = encodeURIComponent(owner.name);
   let now = new Date();
-  now.setDate(now.getDate() - maxLookbackDays);
+  now.setDate(now.getDate() - MAX_LOOKBACK_DAYS);
   let formattedLookback = now.toISOString().split('T')[0];
   let urlPath = '/api/v2/groups/?owner=' + encodedOwner + '&resultLimit=10000&filters=dateAdded%3E' + formattedLookback;
   request(
     {
-      uri: baseUrl + urlPath,
+      uri: options.url + urlPath,
       method: 'GET',
-      headers: getHeaders(urlPath, 'GET'),
+      headers: getHeaders(urlPath, 'GET', options),
       json: true
     },
     function (err, response, body) {
+      if (err) {
+        return cb(err);
+      }
+      Logger.trace({ body }, 'retrieveThreatConnectGroupObjects');
+      let ownerResult = [];
+
       if (body.hasOwnProperty('data') && body.data.hasOwnProperty('group')) {
-        filterGroupsOnPhrase(body.data.group, owner.name);
+        ownerResult = filterGroupsOnPhrase(entity, body.data.group, owner.name);
       } else {
         Logger.trace(owner.name + ' did not return any groups');
       }
+      cb(null, ownerResult);
     }
   );
 }
 
 // Final function in chain. Outputs groups that contain the keyword/phrase to console.
-function filterGroupsOnPhrase(groups, ownerName) {
+function filterGroupsOnPhrase(entity, groups, ownerName) {
   let ownerResults = {};
   Logger.trace('Filtering ' + ownerName + "'s groups based on inputted phrase");
+
   let keywordMatches = groups.filter(function (group) {
-    return group.name.includes(lookupPhrase);
+    return group.name.includes(enity.value);
   }, groups);
+
   if (keywordMatches.length > 0) {
     // Removes keys we do not want in Polarity results.
     keywordMatches.map(function (group) {
@@ -169,31 +178,25 @@ function filterGroupsOnPhrase(groups, ownerName) {
   } else {
     Logger.trace(ownerName + ' did not contain the inputted phrase');
   }
+
+  return ownerResults;
 }
 
-function onDetails(lookupResult, options, cb) {
-  setTimeout(() => {
-    lookupResult.data.summary.push('This is a new tag');
-    cb(null, lookupResult.data);
-  }, 3000);
-}
-
-function getHeaders(urlPath, httpMethod) {
+function getHeaders(urlPath, httpMethod, options) {
   let timestamp = Math.floor(Date.now() / 1000);
   return {
-    Authorization: getAuthHeader(urlPath, httpMethod, timestamp),
+    Authorization: getAuthHeader(urlPath, httpMethod, timestamp, options),
     TimeStamp: timestamp
   };
 }
 
-function getAuthHeader(urlPath, httpMethod, timestamp) {
+function getAuthHeader(urlPath, httpMethod, timestamp, options) {
   let signature = urlPath + ':' + httpMethod + ':' + timestamp;
-  let hmacSignatureInBase64 = crypto.createHmac('sha256', secretKey).update(signature).digest('base64');
-  return 'TC ' + accessID + ':' + hmacSignatureInBase64;
+  let hmacSignatureInBase64 = crypto.createHmac('sha256', options.apiKey).update(signature).digest('base64');
+  return 'TC ' + options.accessId + ':' + hmacSignatureInBase64;
 }
 
 module.exports = {
   doLookup,
-  startup,
-  onDetails
+  startup
 };
