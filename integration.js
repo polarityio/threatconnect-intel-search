@@ -1,6 +1,7 @@
 const request = require('request');
 const async = require('async');
 const config = require('./config/config');
+const crypto = require('crypto');
 const fs = require('fs');
 
 let Logger;
@@ -11,7 +12,6 @@ const allowedOwners = [];
 
 function startup(logger) {
   Logger = logger;
-
   let defaults = {};
 
   if (typeof config.request.cert === 'string' && config.request.cert.length > 0) {
@@ -41,6 +41,17 @@ function startup(logger) {
   requestWithDefaults = request.defaults(defaults);
 }
 
+function getSummaryTags(results) {
+  const tags = [];
+  let objectCount = 0;
+  const groups = Object.keys(results);
+  groups.forEach((group) => {
+    objectCount += results[group].groupObjects.length;
+  });
+  tags.push(`Number of results: ${objectCount}`);
+  return tags;
+}
+
 function doLookup(entities, options, cb) {
   const lookupResults = [];
   Logger.trace({ entities, options }, 'doLookup');
@@ -51,17 +62,32 @@ function doLookup(entities, options, cb) {
         if (err) {
           return done(err);
         }
-        lookupResults.push(results);
+
+        if (Object.keys(results).length > 0) {
+          lookupResults.push({
+            entity,
+            data: {
+              summary: [getSummaryTags(results)],
+              details: results
+            }
+          });
+        } else {
+          lookupResults.push({
+            entity,
+            data: null
+          });
+        }
         done();
       });
     },
     (err) => {
+      Logger.trace({ lookupResults }, 'Lookup Results');
       cb(err, lookupResults);
     }
   );
 }
 
-// Retreives all owners from ThreatConnect
+// Retrieves all owners from ThreatConnect
 // https://docs.threatconnect.com/en/latest/rest_api/owners/owners.html#retrieving-multiple-owners
 function getThreatConnectOwners(entity, options, cb) {
   request(
@@ -84,7 +110,7 @@ function getThreatConnectOwners(entity, options, cb) {
 // Filters out owners based on allow/block list. Used to help reduce client side cycles or low fidelity data.
 function parseThreatConnectOwners(entity, owners, options, cb) {
   let validOwners = [];
-  const ownerResults = [];
+  const ownerResults = {};
 
   if (allowedOwners.length > 0) {
     Logger.trace({ allowedOwners }, 'Filtering on allowed owners');
@@ -109,7 +135,12 @@ function parseThreatConnectOwners(entity, owners, options, cb) {
         if (err) {
           return done(err);
         }
-        ownerResults.push(ownerResult);
+        if (Array.isArray(ownerResult) && ownerResult.length > 0) {
+          ownerResults[owner.name] = {
+            collapsed: true,
+            groupObjects: ownerResult
+          };
+        }
         done();
       });
     },
@@ -124,7 +155,7 @@ function parseThreatConnectOwners(entity, owners, options, cb) {
 // https://docs.threatconnect.com/en/latest/rest_api/groups/groups.html#retrieve-all-groups
 // Time filter is added with this syntax
 // https://docs.threatconnect.com/en/latest/rest_api/groups/groups.html#filtering-groups
-// Owner is specified with this syntex
+// Owner is specified with this syntax
 // https://docs.threatconnect.com/en/latest/rest_api/overview.html#specifying-an-owner
 // Result limit is capped at 10,000
 // https://docs.threatconnect.com/en/latest/rest_api/overview.html#pagination
@@ -133,7 +164,7 @@ function retrieveThreatConnectGroupObjects(entity, owner, options, cb) {
   let now = new Date();
   now.setDate(now.getDate() - MAX_LOOKBACK_DAYS);
   let formattedLookback = now.toISOString().split('T')[0];
-  let urlPath = '/api/v2/groups/?owner=' + encodedOwner + '&resultLimit=10000&filters=dateAdded%3E' + formattedLookback;
+  let urlPath = `/api/v2/groups/?owner=${encodedOwner}&resultLimit=10000&filters=dateAdded%3E${formattedLookback}`;
   request(
     {
       uri: options.url + urlPath,
@@ -149,7 +180,7 @@ function retrieveThreatConnectGroupObjects(entity, owner, options, cb) {
       let ownerResult = [];
 
       if (body.hasOwnProperty('data') && body.data.hasOwnProperty('group')) {
-        ownerResult = filterGroupsOnPhrase(entity, body.data.group, owner.name);
+        ownerResult = filterGroupsOnPhrase(entity, body.data.group, owner.name, options);
       } else {
         Logger.trace(owner.name + ' did not return any groups');
       }
@@ -159,12 +190,12 @@ function retrieveThreatConnectGroupObjects(entity, owner, options, cb) {
 }
 
 // Final function in chain. Outputs groups that contain the keyword/phrase to console.
-function filterGroupsOnPhrase(entity, groups, ownerName) {
-  let ownerResults = {};
+function filterGroupsOnPhrase(entity, groups, ownerName, options) {
+  //let ownerResults = [];
   Logger.trace('Filtering ' + ownerName + "'s groups based on inputted phrase");
 
   let keywordMatches = groups.filter(function (group) {
-    return group.name.includes(enity.value);
+    return group.name.toLowerCase().includes(entity.value.toLowerCase());
   }, groups);
 
   if (keywordMatches.length > 0) {
@@ -173,13 +204,13 @@ function filterGroupsOnPhrase(entity, groups, ownerName) {
       delete group['ownerName'];
       delete group['id'];
     });
-    ownerResults[ownerName] = keywordMatches;
-    Logger.trace({ ownerResults }, 'Owner Results');
+    //ownerResults[ownerName] = keywordMatches;
+    Logger.trace({ keywordMatches }, 'Owner Results');
   } else {
     Logger.trace(ownerName + ' did not contain the inputted phrase');
   }
 
-  return ownerResults;
+  return keywordMatches.slice(0, options.resultLimit);
 }
 
 function getHeaders(urlPath, httpMethod, options) {
