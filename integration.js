@@ -168,10 +168,10 @@ function doLookup(entities, options, cb) {
         const filteredOwners = getFilteredOwners(Object.keys(groupCache), options);
         filteredOwners.forEach((owner) => {
           const searchMatches = searchGroups(entity.value.toLowerCase(), groupCache[owner]);
-          const searchMatchesWithLimit = searchMatches.slice(0, options.resultLimit);
-          const filteredSearchMatchesWithLimit = searchMatchesWithLimit.filter((group) =>
+          const filteredSearchMatches = searchMatches.filter((group) =>
             options.validGroupTypes.some((validType) => validType.display.toLowerCase() === group.type.toLowerCase())
           );
+          const filteredSearchMatchesWithLimit = filteredSearchMatches.slice(0, options.resultLimit);
 
           if (filteredSearchMatchesWithLimit.length > 0) {
             searchResults[owner] = {
