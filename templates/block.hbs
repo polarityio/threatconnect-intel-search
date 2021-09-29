@@ -1,21 +1,31 @@
-<h1 class="p-title">{{fa-icon icon="info-circle" fixedWidth=true}} Information</h1>
-<div>
-  <span class="p-key">Query: </span>
-  <span class="p-value red-text">{{block.data.details.args.query}}</span>
-</div>
-{{#if block.data.details.origin}}
-  <div>
-    <span class="p-key">Origin: </span>
-    <span class="p-value">{{block.data.details.origin}}</span>
-  </div>
-{{/if}}
-<div>
-  <span class="p-key">Url: </span>
-  <span class="p-value">
-    <a class="p-link" href="{{block.data.details.url}}">{{block.data.details.url}}</a>
-  </span>
-</div>
-<div>
-  <span class="p-key">Accept Header: </span>
-  <span class="p-value">{{block.data.details.headers.Accept}}</span>
-</div>
+{{#each-in details as |owner result|}}
+    {{#if (gt result.groups.length 0)}}
+        <div class="mb-2">
+            <a class="p-action" {{on "click" (action "toggleGroup" owner)}}>
+                {{owner}} ({{result.groups.length}})
+                {{#unless (eq result.collapsed false)}}
+                    {{fa-icon icon="chevron-down"}}
+                {{else}}
+                    {{fa-icon icon="chevron-up"}}
+                {{/unless}}
+            </a>
+        </div>
+        {{#if (eq result.collapsed false)}}
+            {{#each result.groups as |group|}}
+                <div class="mb-2 item">
+                    <div>
+                        <a class="p-link" href="{{group.webLink}}">{{group.name}} {{fa-icon icon="external-link-square" class="external-link-icon" fixedWidth=true}}</a>
+                    </div>
+                    <div>
+                        <span class="p-key">Type: </span>
+                        <span class="p-value">{{group.type}}</span>
+                    </div>
+                    <div>
+                        <span class="p-key">Date Added: </span>
+                        <span class="p-value">{{group.dateAdded}}</span>
+                    </div>
+                </div>
+            {{/each}}
+        {{/if}}
+    {{/if}}
+{{/each-in}}
