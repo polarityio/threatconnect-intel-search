@@ -7,9 +7,23 @@ const schedule = require('node-schedule');
 
 let Logger;
 let requestWithDefaults;
-const owners = null;
+/**
+ * Object containing cached group information for each owner
+ *
+ * ```
+ * {
+ *   'VXVault': [{}, {}, {}],
+ *   'Technical Blogs and Reports': [{},{},{}]
+ * }
+ * ```
+ * @type {null}
+ */
+let groupCache = null;
+
+let groupCacheUpdateCronJob = null;
 
 const CRON_ONCE_PER_HOUR = '0 * * * *';
+//const CRON_ONCE_PER_MINUTE = '* * * * *';
 
 function startup(logger) {
   Logger = logger;
@@ -42,7 +56,12 @@ function startup(logger) {
   requestWithDefaults = request.defaults(defaults);
 }
 
-// Returns total amount of group objects returned between all owners
+/**
+ * Returns total amount of group objects returned between all owners
+ *
+ * @param searchResults
+ * @returns {*[]}
+ */
 function getSummaryTags(searchResults) {
   const tags = [];
   let objectCount = 0;
@@ -54,67 +73,123 @@ function getSummaryTags(searchResults) {
   return tags;
 }
 
+/**
+ * Sets up the group cache update cron job
+ *
+ * @param options
+ */
+function setupCacheUpdateCron(options) {
+  Logger.info("Initializing group update cron job");
+  groupCacheUpdateCronJob = schedule.scheduleJob(CRON_ONCE_PER_HOUR, () => {
+    cacheGroups(options, (err) => {
+      if (err) {
+        Logger.error({ err }, 'Failed to update cache');
+      }
+    });
+  });
+}
+
+/**
+ * Fetches all groups and caches them by owner name
+ *
+ * @param options
+ * @param cb
+ */
+function cacheGroups(options, cb) {
+  async.waterfall(
+    [
+      function (next) {
+        getThreatConnectOwners(options, next);
+      },
+      function (owners, next) {
+        getGroupsForEachOwner(owners, options, next);
+      },
+      function (ownerToGroupsMapping, next) {
+        // Set the global group cache
+        groupCache = ownerToGroupsMapping;
+        const keys = Object.keys(groupCache);
+        Logger.info(
+          {
+            numOwners: keys.length,
+            numGroups: keys.reduce((count, key) => {
+              count += groupCache[key].length;
+              return count;
+            }, 0)
+          },
+          'Updated group cache'
+        );
+        next();
+      }
+    ],
+    cb
+  );
+}
+
+/**
+ * Sets the cache (groupCache) if it hasn't been set yet
+ *
+ * @param options
+ * @param cb
+ */
+function maybeCacheGroups(options, cb) {
+  if (groupCache === null) {
+    cacheGroups(options, cb);
+  } else {
+    cb();
+  }
+}
+
 function doLookup(entities, options, cb) {
   const lookupResults = [];
 
   Logger.trace({ entities, options }, 'doLookup');
 
+  if(groupCacheUpdateCronJob === null){
+    setupCacheUpdateCron(options);
+  }
+
   async.each(
     entities,
     (entity, entityDone) => {
-      async.waterfall(
-        [
-          function (next) {
-            getThreatConnectOwners(entity, options, next);
-          },
-          function (owners, next) {
-            const filteredOwners = getFilteredOwners(owners, options);
-            getGroupsForEachOwner(filteredOwners, options, next);
-          },
-          function (ownerToGroupsMapping, next) {
-            const owners = Object.keys(ownerToGroupsMapping);
-            const searchResults = {};
-            owners.forEach((owner) => {
-              const searchMatches = searchGroups(entity.value.toLowerCase(), ownerToGroupsMapping[owner]);
-              const searchMatchesWithLimit = searchMatches.slice(0, options.resultLimit);
-              const filteredSearchMatchesWithLimit = searchMatchesWithLimit.filter((group) =>
-                options.validGroupTypes.some(
-                  (validType) => validType.display.toLowerCase() === group.type.toLowerCase()
-                )
-              );
-
-              if(filteredSearchMatchesWithLimit.length > 0){
-                searchResults[owner] = {
-                  groups: filteredSearchMatchesWithLimit
-                };
-              }
-            });
-            next(null, searchResults);
-          }
-        ],
-        (err, searchResults) => {
-          if (err) {
-            return entityDone(err);
-          }
-
-          if (Object.keys(searchResults).length > 0) {
-            lookupResults.push({
-              entity,
-              data: {
-                summary: [getSummaryTags(searchResults)],
-                details: searchResults
-              }
-            });
-          } else {
-            lookupResults.push({
-              entity,
-              data: null
-            });
-          }
-
-          entityDone();
+      maybeCacheGroups(options, (err) => {
+        if (err) {
+          // We ran into an error caching the groups
+          return entityDone(err);
         }
-      );
+
+        const searchResults = {};
+        const filteredOwners = getFilteredOwners(Object.keys(groupCache), options);
+        filteredOwners.forEach((owner) => {
+          const searchMatches = searchGroups(entity.value.toLowerCase(), groupCache[owner]);
+          const searchMatchesWithLimit = searchMatches.slice(0, options.resultLimit);
+          const filteredSearchMatchesWithLimit = searchMatchesWithLimit.filter((group) =>
+            options.validGroupTypes.some((validType) => validType.display.toLowerCase() === group.type.toLowerCase())
+          );
+
+          if (filteredSearchMatchesWithLimit.length > 0) {
+            searchResults[owner] = {
+              groups: filteredSearchMatchesWithLimit
+            };
+          }
+        });
+
+        if (Object.keys(searchResults).length > 0) {
+          lookupResults.push({
+            entity,
+            data: {
+              summary: [getSummaryTags(searchResults)],
+              details: searchResults
+            }
+          });
+        } else {
+          lookupResults.push({
+            entity,
+            data: null
+          });
+        }
+
+        entityDone();
+      });
     },
     (err) => {
       Logger.trace({ lookupResults }, 'Lookup Results');
@@ -126,11 +201,12 @@ function doLookup(entities, options, cb) {
 /**
  * Returns an array of all TC Owners
  * https://docs.threatconnect.com/en/latest/rest_api/owners/owners.html#retrieving-multiple-owners
+ *
  * @param entity
  * @param options
  * @param cb
  */
-function getThreatConnectOwners(entity, options, cb) {
+function getThreatConnectOwners(options, cb) {
   request(
     {
       uri: options.url + '/api/v2/owners',
@@ -271,19 +347,19 @@ function getAuthHeader(urlPath, httpMethod, timestamp, options) {
 /**
  * Filter owners based on either the organization block list or organization allow list set through the
  * integration options.
- * @param owners
- * @param options
- * @returns {*}
+ * @param owners Array of strings which are the names of owners
+ * @param options user options object
+ * @returns {*} an array of filtered owners based on users allow and blocklist settings
  */
-function getFilteredOwners(owners, options) {
+function getFilteredOwners(ownerNames, options) {
   if (options.searchBlocklist.trim().length > 0) {
     const blocklistedOrgs = createSearchOrgBlocklist(options);
-    return owners.filter((owner) => !blocklistedOrgs.has(owner.name.toLowerCase()));
+    return ownerNames.filter((owner) => !blocklistedOrgs.has(owner.toLowerCase()));
   } else if (options.searchAllowlist.trim().length > 0) {
     const allowlistedOrgs = createSearchOrgAllowlist(options);
-    return owners.filter((owner) => allowlistedOrgs.has(owner.name.toLowerCase()));
+    return ownerNames.filter((owner) => allowlistedOrgs.has(owner.toLowerCase()));
   } else {
-    return owners;
+    return ownerNames;
   }
 }
 
