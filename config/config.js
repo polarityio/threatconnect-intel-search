@@ -80,6 +80,153 @@ module.exports = {
       type: 'number',
       userCanEdit: false,
       adminOnly: true
+    },
+    {
+      key: 'maxLookbackDays',
+      name: 'Max Lookback Days',
+      description: 'Maximum of number of days back to search for group objects',
+      default: 365,
+      type: 'number',
+      userCanEdit: false,
+      adminOnly: true
+    },
+    {
+      key: 'validGroupTypes',
+      name: 'Group Types to Return',
+      description:
+        'The types of group objects that should be returned to Polarity. Some of the groups shown are only available in ThreatConnect version  6.3 and after. Please check that you have the groups selected before querying',
+      default: [
+        {
+          value: 'adversary',
+          display: 'Adversary'
+        },
+        {
+          value: 'campaign',
+          display: 'Campaign'
+        },
+        {
+          value: 'document',
+          display: 'Document'
+        },
+        {
+          value: 'email',
+          display: 'Email'
+        },
+        {
+          value: 'event',
+          display: 'Event'
+        },
+        {
+          value: 'incident',
+          display: 'Incident'
+        },
+        {
+          value: 'intrusionSet',
+          display: 'Intrusion Set'
+        },
+        {
+          value: 'report',
+          display: 'Report'
+        },
+        {
+          value: 'signature',
+          display: 'Signature'
+        },
+        {
+          value: 'threat',
+          display: 'Threat'
+        }
+      ],
+      type: 'select',
+      options: [
+        {
+          value: 'adversary',
+          display: 'Adversary'
+        },
+        {
+          value: 'attackPattern',
+          display: 'Attack Pattern'
+        },
+        {
+          value: 'campaign',
+          display: 'Campaign'
+        },
+        {
+          value: 'courseOfAction',
+          display: 'Course of Action'
+        },
+        {
+          value: 'document',
+          display: 'Document'
+        },
+        {
+          value: 'email',
+          display: 'Email'
+        },
+        {
+          value: 'event',
+          display: 'Event'
+        },
+        {
+          value: 'incident',
+          display: 'Incident'
+        },
+        {
+          value: 'intrusionSet',
+          display: 'Intrusion Set'
+        },
+        {
+          value: 'malware',
+          display: 'Malware'
+        },
+        {
+          value: 'report',
+          display: 'Report'
+        },
+        {
+          value: 'signature',
+          display: 'Signature'
+        },
+        {
+          value: 'tactic',
+          display: 'Tactic'
+        },
+        {
+          value: 'threat',
+          display: 'Threat'
+        },
+        {
+          value: 'tool',
+          display: 'Tool'
+        },
+        {
+          value: 'vulnerability',
+          display: 'Vulnerability'
+        }
+      ],
+      multiple: true,
+      userCanEdit: false,
+      adminOnly: false
+    },
+    {
+      key: 'searchBlocklist',
+      name: 'Organization Search Blocklist',
+      description:
+        'By default all organizations visible to the provided API User will be searched.  This blocklist is a comma delimited list of organizations you do not want searched. This option cannot be used in conjunction with the "Organization Search Allowlist" option.',
+      default: '',
+      type: 'text',
+      userCanEdit: false,
+      adminOnly: true
+    },
+    {
+      key: 'searchAllowlist',
+      name: 'Organization Search Allowlist',
+      description:
+        'By default all organizations visible to the provided API User will be searched. This allowlist is a comma delimited list of organizations you want searched (organizations not listed will not be searched). This option cannot be used in conjunction with the "Organization Search Blocklist" option',
+      default: '',
+      type: 'text',
+      userCanEdit: false,
+      adminOnly: true
     }
   ]
 };

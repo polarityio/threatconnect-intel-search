@@ -1,31 +1,31 @@
 {{#each-in details as |owner result|}}
-    {{#if (gt result.groupObjects.length 0)}}
+    {{#if (gt result.groups.length 0)}}
         <div class="mb-2">
             <a class="p-action" {{on "click" (action "toggleGroup" owner)}}>
-                {{owner}} ({{result.groupObjects.length}})
-                {{#if result.collapsed}}
-                    {{fa-icon icon="chevron-up"}}
-                {{else}}
+                {{owner}} ({{result.groups.length}})
+                {{#unless (eq result.collapsed false)}}
                     {{fa-icon icon="chevron-down"}}
-                {{/if}}
+                {{else}}
+                    {{fa-icon icon="chevron-up"}}
+                {{/unless}}
             </a>
         </div>
-        {{#unless result.collapsed}}
-            {{#each result.groupObjects as |object|}}
+        {{#if (eq result.collapsed false)}}
+            {{#each result.groups as |group|}}
                 <div class="mb-2 item">
                     <div>
-                        <a class="p-link" href="{{object.webLink}}">{{object.name}} {{fa-icon icon="external-link-square" class="external-link-icon" fixedWidth=true}}</a>
+                        <a class="p-link" href="{{group.webLink}}">{{group.name}} {{fa-icon icon="external-link-square" class="external-link-icon" fixedWidth=true}}</a>
                     </div>
                     <div>
                         <span class="p-key">Type: </span>
-                        <span class="p-value">{{object.type}}</span>
+                        <span class="p-value">{{group.type}}</span>
                     </div>
                     <div>
                         <span class="p-key">Date Added: </span>
-                        <span class="p-value">{{object.dateAdded}}</span>
+                        <span class="p-value">{{group.dateAdded}}</span>
                     </div>
                 </div>
             {{/each}}
-        {{/unless}}
+        {{/if}}
     {{/if}}
 {{/each-in}}

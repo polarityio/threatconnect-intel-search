@@ -3,12 +3,13 @@ const async = require('async');
 const config = require('./config/config');
 const crypto = require('crypto');
 const fs = require('fs');
+const schedule = require('node-schedule');
 
 let Logger;
 let requestWithDefaults;
-const MAX_LOOKBACK_DAYS = 360;
-const blockedOwners = [];
-const allowedOwners = [];
+const owners = null;
+
+const CRON_ONCE_PER_HOUR = '0 * * * *';
 
 function startup(logger) {
   Logger = logger;
@@ -41,12 +42,13 @@ function startup(logger) {
   requestWithDefaults = request.defaults(defaults);
 }
 
-function getSummaryTags(results) {
+// Returns total amount of group objects returned between all owners
+function getSummaryTags(searchResults) {
   const tags = [];
   let objectCount = 0;
-  const groups = Object.keys(results);
-  groups.forEach((group) => {
-    objectCount += results[group].groupObjects.length;
+  const owners = Object.keys(searchResults);
+  owners.forEach((owner) => {
+    objectCount += searchResults[owner].groups.length;
   });
   tags.push(`Number of results: ${objectCount}`);
   return tags;
@@ -54,31 +56,65 @@ function getSummaryTags(results) {
 
 function doLookup(entities, options, cb) {
   const lookupResults = [];
+
   Logger.trace({ entities, options }, 'doLookup');
+
   async.each(
     entities,
-    (entity, done) => {
-      getThreatConnectOwners(entity, options, (err, results) => {
-        if (err) {
-          return done(err);
-        }
+    (entity, entityDone) => {
+      async.waterfall(
+        [
+          function (next) {
+            getThreatConnectOwners(entity, options, next);
+          },
+          function (owners, next) {
+            const filteredOwners = getFilteredOwners(owners, options);
+            getGroupsForEachOwner(filteredOwners, options, next);
+          },
+          function (ownerToGroupsMapping, next) {
+            const owners = Object.keys(ownerToGroupsMapping);
+            const searchResults = {};
+            owners.forEach((owner) => {
+              const searchMatches = searchGroups(entity.value.toLowerCase(), ownerToGroupsMapping[owner]);
+              const searchMatchesWithLimit = searchMatches.slice(0, options.resultLimit);
+              const filteredSearchMatchesWithLimit = searchMatchesWithLimit.filter((group) =>
+                options.validGroupTypes.some(
+                  (validType) => validType.display.toLowerCase() === group.type.toLowerCase()
+                )
+              );
 
-        if (Object.keys(results).length > 0) {
-          lookupResults.push({
-            entity,
-            data: {
-              summary: [getSummaryTags(results)],
-              details: results
-            }
-          });
-        } else {
-          lookupResults.push({
-            entity,
-            data: null
-          });
+              if(filteredSearchMatchesWithLimit.length > 0){
+                searchResults[owner] = {
+                  groups: filteredSearchMatchesWithLimit
+                };
+              }
+            });
+            next(null, searchResults);
+          }
+        ],
+        (err, searchResults) => {
+          if (err) {
+            return entityDone(err);
+          }
+
+          if (Object.keys(searchResults).length > 0) {
+            lookupResults.push({
+              entity,
+              data: {
+                summary: [getSummaryTags(searchResults)],
+                details: searchResults
+              }
+            });
+          } else {
+            lookupResults.push({
+              entity,
+              data: null
+            });
+          }
+
+          entityDone();
         }
-        done();
-      });
+      );
     },
     (err) => {
       Logger.trace({ lookupResults }, 'Lookup Results');
@@ -87,8 +123,13 @@ function doLookup(entities, options, cb) {
   );
 }
 
-// Retrieves all owners from ThreatConnect
-// https://docs.threatconnect.com/en/latest/rest_api/owners/owners.html#retrieving-multiple-owners
+/**
+ * Returns an array of all TC Owners
+ * https://docs.threatconnect.com/en/latest/rest_api/owners/owners.html#retrieving-multiple-owners
+ * @param entity
+ * @param options
+ * @param cb
+ */
 function getThreatConnectOwners(entity, options, cb) {
   request(
     {
@@ -101,70 +142,77 @@ function getThreatConnectOwners(entity, options, cb) {
       if (err) {
         return cb(err);
       }
-      Logger.trace({ body }, 'getThreatConnectOwners');
-      parseThreatConnectOwners(entity, body.data.owner, options, cb);
+
+      Logger.trace({ body, statusCode: response.statusCode }, 'getThreatConnectOwners');
+
+      if (response.statusCode === 200) {
+        cb(null, body.data.owner);
+      } else {
+        cb({
+          detail: `Unexpected status code ${response.statusCode} received.`,
+          body: body
+        });
+      }
     }
   );
 }
 
-// Filters out owners based on allow/block list. Used to help reduce client side cycles or low fidelity data.
-function parseThreatConnectOwners(entity, owners, options, cb) {
-  let validOwners = [];
-  const ownerResults = {};
-
-  if (allowedOwners.length > 0) {
-    Logger.trace({ allowedOwners }, 'Filtering on allowed owners');
-    validOwners = owners.filter(function (owner) {
-      return allowedOwners.includes(owner.name);
-    }, owners);
-  } else if (blockedOwners.length > 0) {
-    Logger.trace({ blockedOwners }, 'Filtering on blocked owners');
-    validOwners = owners.filter(function (owner) {
-      return !blockedOwners.includes(owner.name);
-    }, owners);
-  } else {
-    Logger.trace('No owners were filtered - using all available.');
-    validOwners = owners;
-  }
-  Logger.trace({ validOwners }, 'Valid Owners');
-
+/**
+ * Returns an Object keyed on the owner name where the values is an array of group objects associated with that
+ * owner.
+ *
+ * @param entity
+ * @param owners
+ * @param options
+ * @param cb
+ */
+function getGroupsForEachOwner(owners, options, cb) {
+  const groupObjectsMap = {};
   async.each(
-    validOwners,
+    owners,
     function (owner, done) {
-      retrieveThreatConnectGroupObjects(entity, owner, options, (err, ownerResult) => {
+      findGroupsByOwner(owner, options, (err, groupObjects) => {
         if (err) {
           return done(err);
         }
-        if (Array.isArray(ownerResult) && ownerResult.length > 0) {
-          ownerResults[owner.name] = {
-            collapsed: true,
-            groupObjects: ownerResult
-          };
-        }
+
+        groupObjectsMap[owner.name] = groupObjects;
         done();
       });
     },
     (err) => {
-      cb(err, ownerResults);
+      cb(err, groupObjectsMap);
     }
   );
 }
 
-// All groups are returned because TC does not support the necessary server side filtering for this use case. They only support name "starts with" or name "is", not "contains".
-// Group are retrieved using this API
-// https://docs.threatconnect.com/en/latest/rest_api/groups/groups.html#retrieve-all-groups
-// Time filter is added with this syntax
-// https://docs.threatconnect.com/en/latest/rest_api/groups/groups.html#filtering-groups
-// Owner is specified with this syntax
-// https://docs.threatconnect.com/en/latest/rest_api/overview.html#specifying-an-owner
-// Result limit is capped at 10,000
-// https://docs.threatconnect.com/en/latest/rest_api/overview.html#pagination
-function retrieveThreatConnectGroupObjects(entity, owner, options, cb) {
+/**
+ * All groups are returned for the given owner because TC does not support the necessary server side filtering for this use case.
+ * They only support name "starts with" or name "is", not "contains".
+ *
+ * Group are retrieved using this API
+ * https://docs.threatconnect.com/en/latest/rest_api/groups/groups.html#retrieve-all-groups
+ *
+ * Time filter is added with this syntax
+ * https://docs.threatconnect.com/en/latest/rest_api/groups/groups.html#filtering-groups
+ *
+ * Owner is specified with this syntax
+ * https://docs.threatconnect.com/en/latest/rest_api/overview.html#specifying-an-owner
+ *
+ * Result limit is capped at 10,000
+ * https://docs.threatconnect.com/en/latest/rest_api/overview.html#pagination
+ *
+ * @param owner
+ * @param options
+ * @param cb
+ */
+function findGroupsByOwner(owner, options, cb) {
   const encodedOwner = encodeURIComponent(owner.name);
-  let now = new Date();
-  now.setDate(now.getDate() - MAX_LOOKBACK_DAYS);
-  let formattedLookback = now.toISOString().split('T')[0];
-  let urlPath = `/api/v2/groups/?owner=${encodedOwner}&resultLimit=10000&filters=dateAdded%3E${formattedLookback}`;
+  const now = new Date();
+  now.setDate(now.getDate() - options.maxLookbackDays);
+  const formattedLookback = now.toISOString().split('T')[0];
+  const urlPath = `/api/v2/groups/?owner=${encodedOwner}&resultLimit=10000&filters=dateAdded%3E${formattedLookback}`;
+
   request(
     {
       uri: options.url + urlPath,
@@ -172,45 +220,38 @@ function retrieveThreatConnectGroupObjects(entity, owner, options, cb) {
       headers: getHeaders(urlPath, 'GET', options),
       json: true
     },
-    function (err, response, body) {
+    (err, response, body) => {
       if (err) {
         return cb(err);
       }
       Logger.trace({ body }, 'retrieveThreatConnectGroupObjects');
-      let ownerResult = [];
 
-      if (body.hasOwnProperty('data') && body.data.hasOwnProperty('group')) {
-        ownerResult = filterGroupsOnPhrase(entity, body.data.group, owner.name, options);
+      if (body && body.data && body.data.group) {
+        cb(null, body.data.group);
       } else {
-        Logger.trace(owner.name + ' did not return any groups');
+        cb(null, []);
       }
-      cb(null, ownerResult);
     }
   );
 }
 
-// Final function in chain. Outputs groups that contain the keyword/phrase to console.
-function filterGroupsOnPhrase(entity, groups, ownerName, options) {
-  //let ownerResults = [];
-  Logger.trace('Filtering ' + ownerName + "'s groups based on inputted phrase");
+/**
+ * Searches each group in the groups array for a match on group name against the searchTerm
+ * @param searchTerm, the term to search within each group name
+ * @param groups, array of groups to search
+ * @returns {*} array of matching groups
+ */
+function searchGroups(searchTerm, groups) {
+  let groupMatches = groups.filter((group) => group.name.toLowerCase().includes(searchTerm));
 
-  let keywordMatches = groups.filter(function (group) {
-    return group.name.toLowerCase().includes(entity.value.toLowerCase());
-  }, groups);
+  // Removes keys we do not want in Polarity results.
+  groupMatches = groupMatches.map((group) => {
+    delete group['ownerName'];
+    delete group['id'];
+    return group;
+  });
 
-  if (keywordMatches.length > 0) {
-    // Removes keys we do not want in Polarity results.
-    keywordMatches.map(function (group) {
-      delete group['ownerName'];
-      delete group['id'];
-    });
-    //ownerResults[ownerName] = keywordMatches;
-    Logger.trace({ keywordMatches }, 'Owner Results');
-  } else {
-    Logger.trace(ownerName + ' did not contain the inputted phrase');
-  }
-
-  return keywordMatches.slice(0, options.resultLimit);
+  return groupMatches;
 }
 
 function getHeaders(urlPath, httpMethod, options) {
@@ -225,6 +266,66 @@ function getAuthHeader(urlPath, httpMethod, timestamp, options) {
   let signature = urlPath + ':' + httpMethod + ':' + timestamp;
   let hmacSignatureInBase64 = crypto.createHmac('sha256', options.apiKey).update(signature).digest('base64');
   return 'TC ' + options.accessId + ':' + hmacSignatureInBase64;
+}
+
+/**
+ * Filter owners based on either the organization block list or organization allow list set through the
+ * integration options.
+ * @param owners
+ * @param options
+ * @returns {*}
+ */
+function getFilteredOwners(owners, options) {
+  if (options.searchBlocklist.trim().length > 0) {
+    const blocklistedOrgs = createSearchOrgBlocklist(options);
+    return owners.filter((owner) => !blocklistedOrgs.has(owner.name.toLowerCase()));
+  } else if (options.searchAllowlist.trim().length > 0) {
+    const allowlistedOrgs = createSearchOrgAllowlist(options);
+    return owners.filter((owner) => allowlistedOrgs.has(owner.name.toLowerCase()));
+  } else {
+    return owners;
+  }
+}
+
+/**
+ * Create a block list of organizations based on the options
+ *
+ * @param options
+ * @returns {Set<any>} Set of blocklisted organizations (i.e., owners)
+ */
+function createSearchOrgBlocklist(options) {
+  const blocklistedOrgs = new Set();
+
+  if (typeof options.searchBlocklist === 'string' && options.searchBlocklist.trim().length > 0) {
+    let tokens = options.searchBlocklist.split(',');
+    tokens.forEach((token) => {
+      token = token.trim().toLowerCase();
+      if (token.length > 0) {
+        blocklistedOrgs.add(token);
+      }
+    });
+    return blocklistedOrgs;
+  }
+}
+
+/**
+ * Create an allow list of organizations based on the options
+ * @param options
+ * @returns {Set<any>} Set of allowed organizations (i.e., owners)
+ */
+function createSearchOrgAllowlist(options) {
+  const allowlistedOrgs = new Set();
+
+  if (typeof options.searchAllowlist === 'string' && options.searchAllowlist.trim().length > 0) {
+    let tokens = options.searchAllowlist.split(',');
+    tokens.forEach((token) => {
+      token = token.trim().toLowerCase();
+      if (token.length > 0) {
+        allowlistedOrgs.add(token);
+      }
+    });
+    return allowlistedOrgs;
+  }
 }
 
 module.exports = {
