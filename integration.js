@@ -82,7 +82,7 @@ function getSummaryTags(searchResults) {
  * @param options
  */
 function setupCacheUpdateCron(options) {
-  Logger.info("Initializing group update cron job");
+  Logger.info('Initializing group update cron job');
   groupCacheUpdateCronJob = schedule.scheduleJob(CRON_ONCE_PER_HOUR, () => {
     cacheGroups(options, (err) => {
       if (err) {
@@ -147,7 +147,7 @@ function doLookup(entities, options, cb) {
 
   Logger.trace({ entities, options }, 'doLookup');
 
-  if(groupCacheUpdateCronJob === null){
+  if (groupCacheUpdateCronJob === null) {
     setupCacheUpdateCron(options);
   }
 
@@ -160,7 +160,7 @@ function doLookup(entities, options, cb) {
           return entityDone(err);
         }
 
-        if(entity.value.length > options.maxSearchTermLength && options.maxSearchTermLength !== 0){
+        if (entity.value.length > options.maxSearchTermLength && options.maxSearchTermLength !== 0) {
           return entityDone();
         }
 
@@ -214,30 +214,32 @@ function doLookup(entities, options, cb) {
  * @param cb
  */
 function getThreatConnectOwners(options, cb) {
-  request(
-    {
-      uri: options.url + '/api/v2/owners',
-      method: 'GET',
-      headers: getHeaders('/api/v2/owners', 'GET', options),
-      json: true
-    },
-    function (err, response, body) {
-      if (err) {
-        return cb(err);
-      }
-
-      Logger.trace({ body, statusCode: response.statusCode }, 'getThreatConnectOwners');
-
-      if (response.statusCode === 200) {
-        cb(null, body.data.owner);
-      } else {
-        cb({
-          detail: `Unexpected status code ${response.statusCode} received.`,
-          body: body
-        });
-      }
+  const tcUrl = new URL(options.url);
+  const urlPath = tcUrl.pathname.endsWith('/') ? tcUrl.pathname : tcUrl.pathname + '/';
+  options.url = options.url.endsWith('/') ? options.url : options.url + '/';
+  const requestOptions = {
+    uri: options.url + 'v2/owners',
+    method: 'GET',
+    headers: getHeaders(`${urlPath}v2/owners`, 'GET', options),
+    json: true
+  };
+  Logger.trace({requestOptions}, 'getThreatConnectOwners');
+  request(requestOptions, function (err, response, body) {
+    if (err) {
+      return cb(err);
     }
-  );
+
+    Logger.trace({ body, statusCode: response.statusCode }, 'getThreatConnectOwners');
+
+    if (response.statusCode === 200) {
+      cb(null, body.data.owner);
+    } else {
+      cb({
+        detail: `Unexpected status code ${response.statusCode} received.`,
+        body: body
+      });
+    }
+  });
 }
 
 /**
@@ -290,32 +292,35 @@ function getGroupsForEachOwner(owners, options, cb) {
  * @param cb
  */
 function findGroupsByOwner(owner, options, cb) {
+  const tcUrl = new URL(options.url);
+  options.url = options.url.endsWith('/') ? options.url : options.url + '/';
   const encodedOwner = encodeURIComponent(owner.name);
   const now = new Date();
   now.setDate(now.getDate() - options.maxLookbackDays);
   const formattedLookback = now.toISOString().split('T')[0];
-  const urlPath = `/api/v2/groups/?owner=${encodedOwner}&resultLimit=10000&filters=dateAdded%3E${formattedLookback}`;
+  const urlPath = tcUrl.pathname.endsWith('/') ? tcUrl.pathname : tcUrl.pathname + '/';
+  const apiPath = `v2/groups/?owner=${encodedOwner}&resultLimit=10000&filters=dateAdded%3E${formattedLookback}`;
 
-  request(
-    {
-      uri: options.url + urlPath,
-      method: 'GET',
-      headers: getHeaders(urlPath, 'GET', options),
-      json: true
-    },
-    (err, response, body) => {
-      if (err) {
-        return cb(err);
-      }
-      Logger.trace({ body }, 'retrieveThreatConnectGroupObjects');
+  const requestOptions = {
+    uri: options.url + apiPath,
+    method: 'GET',
+    headers: getHeaders(`${urlPath}${apiPath}`, 'GET', options),
+    json: true
+  };
+  Logger.trace({ requestOptions }, 'findGroupsByOwner');
 
-      if (body && body.data && body.data.group) {
-        cb(null, body.data.group);
-      } else {
-        cb(null, []);
-      }
+  request(requestOptions, (err, response, body) => {
+    if (err) {
+      return cb(err);
     }
-  );
+    Logger.trace({ body }, 'retrieveThreatConnectGroupObjects');
+
+    if (body && body.data && body.data.group) {
+      cb(null, body.data.group);
+    } else {
+      cb(null, []);
+    }
+  });
 }
 
 /**
