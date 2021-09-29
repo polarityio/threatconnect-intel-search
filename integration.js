@@ -23,6 +23,9 @@ let groupCache = null;
 let groupCacheUpdateCronJob = null;
 
 const CRON_ONCE_PER_HOUR = '0 * * * *';
+//const CRON_ONCE_PER_FOUR_HOURS = '0 */4 * * *';
+//const CRON_ONCE_PER_EIGHT_HOURS = '0 */8 * * *';
+//const CRON_EVERY_NIGHT_AT_MIDNIGHT = '0 0 * * *'
 //const CRON_ONCE_PER_MINUTE = '* * * * *';
 
 function startup(logger) {
@@ -155,6 +158,10 @@ function doLookup(entities, options, cb) {
         if (err) {
           // We ran into an error caching the groups
           return entityDone(err);
+        }
+
+        if(entity.value.length > options.maxSearchTermLength && options.maxSearchTermLength !== 0){
+          return entityDone();
         }
 
         const searchResults = {};

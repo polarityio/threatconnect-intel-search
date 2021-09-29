@@ -227,6 +227,16 @@ module.exports = {
       type: 'text',
       userCanEdit: false,
       adminOnly: true
+    },
+    {
+      key: 'maxSearchTermLength',
+      name: 'Maximum Search Term Length',
+      description:
+          'Search terms over this length will not be searched.  Set to 0 for no search limit.  If you have the "allText" custom entity type enabled you should set a maximum search term length.  (Defaults to 100)',
+      default: 100,
+      type: 'number',
+      userCanEdit: false,
+      adminOnly: true
     }
   ]
 };
