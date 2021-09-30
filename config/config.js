@@ -74,9 +74,9 @@ module.exports = {
     },
     {
       key: 'resultLimit',
-      name: 'Result Limit',
-      description: 'Maximum of number of group objects to return per group',
-      default: 10,
+      name: 'Group Type Result Limit',
+      description: 'For each owner, specify the maximum of number of group objects to return per group type.',
+      default: 25,
       type: 'number',
       userCanEdit: false,
       adminOnly: true
@@ -121,7 +121,7 @@ module.exports = {
           display: 'Incident'
         },
         {
-          value: 'intrusionSet',
+          value: 'intrusion set',
           display: 'Intrusion Set'
         },
         {
@@ -144,7 +144,7 @@ module.exports = {
           display: 'Adversary'
         },
         {
-          value: 'attackPattern',
+          value: 'attack pattern',
           display: 'Attack Pattern'
         },
         {
@@ -152,7 +152,7 @@ module.exports = {
           display: 'Campaign'
         },
         {
-          value: 'courseOfAction',
+          value: 'course of action',
           display: 'Course of Action'
         },
         {
@@ -172,7 +172,7 @@ module.exports = {
           display: 'Incident'
         },
         {
-          value: 'intrusionSet',
+          value: 'intrusion set',
           display: 'Intrusion Set'
         },
         {

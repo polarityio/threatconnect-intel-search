@@ -1,31 +1,55 @@
-{{#each-in details as |owner result|}}
-    {{#if (gt result.groups.length 0)}}
-        <div class="mb-2">
-            <a class="p-action" {{on "click" (action "toggleGroup" owner)}}>
-                {{owner}} ({{result.groups.length}})
-                {{#unless (eq result.collapsed false)}}
-                    {{fa-icon icon="chevron-down"}}
-                {{else}}
-                    {{fa-icon icon="chevron-up"}}
-                {{/unless}}
-            </a>
-        </div>
-        {{#if (eq result.collapsed false)}}
-            {{#each result.groups as |group|}}
-                <div class="mb-2 item">
-                    <div>
-                        <a class="p-link" href="{{group.webLink}}">{{group.name}} {{fa-icon icon="external-link-square" class="external-link-icon" fixedWidth=true}}</a>
+{{#each-in searchResults as |owner result|}}
+    <div class="mb-2">
+        <a class="p-action" {{on "click" (action "toggleGroup" owner)}}>
+            <span class="owner-header">{{owner}} ({{result.totalGroups}})</span>
+            {{#unless (eq result.collapsed false)}}
+                {{fa-icon icon="chevron-down"}}
+            {{else}}
+                {{fa-icon icon="chevron-up"}}
+            {{/unless}}
+        </a>
+    </div>
+    {{#if (eq result.collapsed false)}}
+        <div>
+            {{#each-in result.groupTypes as | groupType groupTypeResult |}}
+                <div class="group-type-container mb-2">
+                    <div class="mb-2">
+                        <a class="p-action" {{on "click" (action "toggleGroupType" owner groupType)}}>
+                            {{fa-icon icon=(get iconMap groupType) fixedWidth=true class="type-icon"}} {{groupType}} ({{groupTypeResult.totalGroups}})
+                            {{#unless (eq groupTypeResult.collapsed false)}}
+                                {{fa-icon icon="chevron-down"}}
+                            {{else}}
+                                {{fa-icon icon="chevron-up"}}
+                            {{/unless}}
+                        </a>
                     </div>
-                    <div>
-                        <span class="p-key">Type: </span>
-                        <span class="p-value">{{group.type}}</span>
-                    </div>
-                    <div>
-                        <span class="p-key">Date Added: </span>
-                        <span class="p-value">{{group.dateAdded}}</span>
-                    </div>
+                    {{#if (eq groupTypeResult.collapsed false)}}
+                        <div>
+                            {{#if (gt groupTypeResult.totalGroups details.resultLimit)}}
+                                <div class="mb-2 result-count-container">
+                                    <span class="p-footnote">Showing first {{details.resultLimit}} results out of {{groupTypeResult.totalGroups}}</span>
+                                </div>
+                            {{/if}}
+                            {{#each groupTypeResult.groups as |group|}}
+                                <div class="mb-2 item">
+                                    <div>
+                                        <a class="p-link" href="{{group.webLink}}">{{group.name}} {{fa-icon icon="external-link-square" class="external-link-icon" fixedWidth=true}}</a>
+                                    </div>
+                                    <div>
+                                        <span class="p-key">Type: </span>
+                                        <span class="p-value">{{group.type}}</span>
+                                    </div>
+                                    <div>
+                                        <span class="p-key">Date Added: </span>
+                                        <span class="p-value">{{group.dateAdded}}</span>
+                                    </div>
+                                </div>
+                            {{/each}}
+                        </div>
+                    {{/if}}
                 </div>
-            {{/each}}
-        {{/if}}
+            {{/each-in}}
+
+        </div>
     {{/if}}
 {{/each-in}}

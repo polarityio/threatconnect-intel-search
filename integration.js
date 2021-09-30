@@ -4,6 +4,13 @@ const config = require('./config/config');
 const crypto = require('crypto');
 const fs = require('fs');
 const schedule = require('node-schedule');
+const groupBy = require('lodash.groupby');
+
+const CRON_ONCE_PER_HOUR = '0 * * * *';
+//const CRON_ONCE_PER_FOUR_HOURS = '0 */4 * * *';
+//const CRON_ONCE_PER_EIGHT_HOURS = '0 */8 * * *';
+//const CRON_EVERY_NIGHT_AT_MIDNIGHT = '0 0 * * *'
+//const CRON_ONCE_PER_MINUTE = '* * * * *';
 
 let Logger;
 let requestWithDefaults;
@@ -21,12 +28,6 @@ let requestWithDefaults;
 let groupCache = null;
 
 let groupCacheUpdateCronJob = null;
-
-const CRON_ONCE_PER_HOUR = '0 * * * *';
-//const CRON_ONCE_PER_FOUR_HOURS = '0 */4 * * *';
-//const CRON_ONCE_PER_EIGHT_HOURS = '0 */8 * * *';
-//const CRON_EVERY_NIGHT_AT_MIDNIGHT = '0 0 * * *'
-//const CRON_ONCE_PER_MINUTE = '* * * * *';
 
 function startup(logger) {
   Logger = logger;
@@ -70,7 +71,7 @@ function getSummaryTags(searchResults) {
   let objectCount = 0;
   const owners = Object.keys(searchResults);
   owners.forEach((owner) => {
-    objectCount += searchResults[owner].groups.length;
+    objectCount += searchResults[owner].totalGroups;
   });
   tags.push(`Number of results: ${objectCount}`);
   return tags;
@@ -109,13 +110,20 @@ function cacheGroups(options, cb) {
       },
       function (ownerToGroupsMapping, next) {
         // Set the global group cache
+        const ownerKeys = Object.keys(ownerToGroupsMapping);
+        ownerKeys.forEach((ownerKey) => {
+          const groups = ownerToGroupsMapping[ownerKey];
+          ownerToGroupsMapping[ownerKey] = groupBy(groups, 'type');
+        });
         groupCache = ownerToGroupsMapping;
-        const keys = Object.keys(groupCache);
         Logger.info(
           {
-            numOwners: keys.length,
-            numGroups: keys.reduce((count, key) => {
-              count += groupCache[key].length;
+            numOwners: ownerKeys.length,
+            numGroups: ownerKeys.reduce((count, ownerKey) => {
+              const groupTypes = Object.keys(groupCache[ownerKey]);
+              groupTypes.forEach((groupType) => {
+                count += groupCache[ownerKey][groupType].length;
+              });
               return count;
             }, 0)
           },
@@ -142,6 +150,32 @@ function maybeCacheGroups(options, cb) {
   }
 }
 
+/**
+ * {
+ *  data: {
+ *     summary: [],
+ *     details: {
+ *         ownerName: {
+ *             groupTypes: {
+ *                 Report: {
+ *                     groups: []
+ *                 },
+ *                 Incidents: {
+ *                     groups: []
+ *                 }
+ *             },
+ *             totalGroups: 100
+ *         },
+ *         ownerName2: {
+ *             ... repeat
+ *         }
+ *     }
+ *   }
+ * }
+ * @param entities
+ * @param options
+ * @param cb
+ */
 function doLookup(entities, options, cb) {
   const lookupResults = [];
 
@@ -167,15 +201,28 @@ function doLookup(entities, options, cb) {
         const searchResults = {};
         const filteredOwners = getFilteredOwners(Object.keys(groupCache), options);
         filteredOwners.forEach((owner) => {
-          const searchMatches = searchGroups(entity.value.toLowerCase(), groupCache[owner]);
-          const filteredSearchMatches = searchMatches.filter((group) =>
-            options.validGroupTypes.some((validType) => validType.display.toLowerCase() === group.type.toLowerCase())
-          );
-          const filteredSearchMatchesWithLimit = filteredSearchMatches.slice(0, options.resultLimit);
+          const groupCacheFiltered = Object.keys(groupCache[owner]).reduce((accum, groupType) => {
+            if(options.validGroupTypes.some((validType) => validType.value === groupType.toLowerCase())){
+              // this is a group type that should be searched
+              accum[groupType] = groupCache[owner][groupType];
+            }
+            return accum;
+          }, {})
+          const searchMatches = searchGroups(entity.value.toLowerCase(), groupCacheFiltered);
+          let totalGroups = 0;
+          const searchMatchesWithLimit = Object.keys(searchMatches).reduce((accum, groupType) => {
+            accum[groupType] = {
+              groups: searchMatches[groupType].slice(0, options.resultLimit),
+              totalGroups: searchMatches[groupType].length
+            };
+            totalGroups += searchMatches[groupType].length;
+            return accum;
+          }, {});
 
-          if (filteredSearchMatchesWithLimit.length > 0) {
+          if (Object.keys(searchMatches).length > 0) {
             searchResults[owner] = {
-              groups: filteredSearchMatchesWithLimit
+              groupTypes: searchMatchesWithLimit,
+              totalGroups
             };
           }
         });
@@ -185,7 +232,10 @@ function doLookup(entities, options, cb) {
             entity,
             data: {
               summary: [getSummaryTags(searchResults)],
-              details: searchResults
+              details: {
+                resultLimit: options.resultLimit,
+                searchResults
+              }
             }
           });
         } else {
@@ -199,7 +249,7 @@ function doLookup(entities, options, cb) {
       });
     },
     (err) => {
-      Logger.trace({ lookupResults }, 'Lookup Results');
+      Logger.info({ lookupResults }, 'Lookup Results');
       cb(err, lookupResults);
     }
   );
@@ -223,7 +273,7 @@ function getThreatConnectOwners(options, cb) {
     headers: getHeaders(`${urlPath}v2/owners`, 'GET', options),
     json: true
   };
-  Logger.trace({requestOptions}, 'getThreatConnectOwners');
+  Logger.trace({ requestOptions }, 'getThreatConnectOwners');
   request(requestOptions, function (err, response, body) {
     if (err) {
       return cb(err);
@@ -330,14 +380,13 @@ function findGroupsByOwner(owner, options, cb) {
  * @returns {*} array of matching groups
  */
 function searchGroups(searchTerm, groups) {
-  let groupMatches = groups.filter((group) => group.name.toLowerCase().includes(searchTerm));
-
-  // Removes keys we do not want in Polarity results.
-  groupMatches = groupMatches.map((group) => {
-    delete group['ownerName'];
-    delete group['id'];
-    return group;
-  });
+  let groupMatches = {};
+  Object.keys(groups).forEach((groupType) => {
+    const matches = groups[groupType].filter((group) => group.name.toLowerCase().includes(searchTerm))
+    if(matches.length > 0){
+      groupMatches[groupType] = matches;
+    }
+  })
 
   return groupMatches;
 }
