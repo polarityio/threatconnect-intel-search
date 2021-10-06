@@ -158,10 +158,12 @@ function maybeCacheGroups(options, cb) {
  *         ownerName: {
  *             groupTypes: {
  *                 Report: {
- *                     groups: []
+ *                     groups: [],
+ *                     totalGroups: 75
  *                 },
  *                 Incidents: {
- *                     groups: []
+ *                     groups: [],
+ *                     totalGroups: 25
  *                 }
  *             },
  *             totalGroups: 100
