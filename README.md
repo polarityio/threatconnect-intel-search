@@ -1,6 +1,12 @@
 # Polarity ThreatConnect Intel Search Integration
 
-The Polarity ThreatConnect Intel Search integration allows Polarity to search Group titles in your instance of ThreatConnect. The integration 
+![mode:on demand only](https://img.shields.io/badge/mode-on%20demand%20only-blue.svg)
+
+The Polarity ThreatConnect Intel Search integration allows Polarity to search Group titles in your instance of ThreatConnect.  
+
+The integration works by caching up to 10,000 group objects per owner in memory.  The integration will then search the title of these group objects and return any matches. The cached group objects are refreshed automatically every hour.
+
+By default the integration supports full text searches.  Please check the "Manage Integration Data" option to modify what entity types are searched. 
 
 <div>
   <img width="400" alt="Integration Example" src="./images/overlay.png">
