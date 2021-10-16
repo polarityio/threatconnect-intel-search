@@ -48,7 +48,7 @@ module.exports = {
     {
       key: 'url',
       name: 'ThreatConnect Instance URL',
-      description: 'The URL of the ThreatConnect instance you would like to connect to (including http:// or https://)',
+      description: 'The URL of the ThreatConnect instance you would like to connect to (including http:// or https://). Note the API URL may end with `/api`.',
       default: '',
       type: 'text',
       userCanEdit: false,

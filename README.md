@@ -16,7 +16,7 @@ By default the integration supports full text searches.  Please check the "Manag
 
 ### ThreatConnect API URL
 
-The API URL of the ThreatConnect instance you would like to connect to (including http:// or https://).  If you are running an internal instance of ThreatConnect on a non-default port, please specify the port here as well.  Note the API URL may end with `/api` in some circumstances. 
+The API URL of the ThreatConnect instance you would like to connect to (including http:// or https://).  If you are running an internal instance of ThreatConnect on a non-default port, please specify the port here as well.  Note the API URL may end with `/api`. 
 
 ### Access ID
 
