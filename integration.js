@@ -6,6 +6,7 @@ const fs = require('fs');
 const schedule = require('node-schedule');
 const groupBy = require('lodash.groupby');
 
+const GROUP_CACHE_LIMIT_PER_OWNER = 10000;
 const CRON_ONCE_PER_HOUR = '0 * * * *';
 //const CRON_ONCE_PER_FOUR_HOURS = '0 */4 * * *';
 //const CRON_ONCE_PER_EIGHT_HOURS = '0 */8 * * *';
@@ -158,10 +159,12 @@ function maybeCacheGroups(options, cb) {
  *         ownerName: {
  *             groupTypes: {
  *                 Report: {
- *                     groups: []
+ *                     groups: [],
+ *                     totalGroups: 75
  *                 },
  *                 Incidents: {
- *                     groups: []
+ *                     groups: [],
+ *                     totalGroups: 25
  *                 }
  *             },
  *             totalGroups: 100
@@ -202,12 +205,12 @@ function doLookup(entities, options, cb) {
         const filteredOwners = getFilteredOwners(Object.keys(groupCache), options);
         filteredOwners.forEach((owner) => {
           const groupCacheFiltered = Object.keys(groupCache[owner]).reduce((accum, groupType) => {
-            if(options.validGroupTypes.some((validType) => validType.value === groupType.toLowerCase())){
+            if (options.validGroupTypes.some((validType) => validType.value === groupType.toLowerCase())) {
               // this is a group type that should be searched
               accum[groupType] = groupCache[owner][groupType];
             }
             return accum;
-          }, {})
+          }, {});
           const searchMatches = searchGroups(entity.value.toLowerCase(), groupCacheFiltered);
           let totalGroups = 0;
           const searchMatchesWithLimit = Object.keys(searchMatches).reduce((accum, groupType) => {
@@ -349,7 +352,7 @@ function findGroupsByOwner(owner, options, cb) {
   now.setDate(now.getDate() - options.maxLookbackDays);
   const formattedLookback = now.toISOString().split('T')[0];
   const urlPath = tcUrl.pathname.endsWith('/') ? tcUrl.pathname : tcUrl.pathname + '/';
-  const apiPath = `v2/groups/?owner=${encodedOwner}&resultLimit=10000&filters=dateAdded%3E${formattedLookback}`;
+  const apiPath = `v2/groups/?owner=${encodedOwner}&resultLimit=${GROUP_CACHE_LIMIT_PER_OWNER}&filters=dateAdded%3E${formattedLookback}`;
 
   const requestOptions = {
     uri: options.url + apiPath,
@@ -382,11 +385,11 @@ function findGroupsByOwner(owner, options, cb) {
 function searchGroups(searchTerm, groups) {
   let groupMatches = {};
   Object.keys(groups).forEach((groupType) => {
-    const matches = groups[groupType].filter((group) => group.name.toLowerCase().includes(searchTerm))
-    if(matches.length > 0){
+    const matches = groups[groupType].filter((group) => group.name.toLowerCase().includes(searchTerm));
+    if (matches.length > 0) {
       groupMatches[groupType] = matches;
     }
-  })
+  });
 
   return groupMatches;
 }

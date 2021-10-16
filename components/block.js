@@ -28,7 +28,6 @@ polarity.export = PolarityComponent.extend({
       }
     },
     toggleGroupType: function (owner, groupType) {
-      console.info("Toggle " + owner + " " + groupType);
       const collapsed = this.get('searchResults.' + owner + '.groupTypes.' + groupType + '.collapsed');
       if (typeof collapsed === 'undefined') {
         this.set('searchResults.' + owner + '.groupTypes.' + groupType + '.collapsed', false);
