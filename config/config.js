@@ -75,7 +75,7 @@ module.exports = {
     {
       key: 'resultLimit',
       name: 'Group Type Result Limit',
-      description: 'For each owner, specify the maximum of number of group objects to return per group type.',
+      description: 'For each owner, specify the maximum of number of group objects to return per group type (defaults to 25).',
       default: 25,
       type: 'number',
       userCanEdit: false,
@@ -84,7 +84,7 @@ module.exports = {
     {
       key: 'maxLookbackDays',
       name: 'Max Lookback Days',
-      description: 'Maximum of number of days back to search for group objects',
+      description: 'Maximum of number of days back to search for group objects (defaults to 365).',
       default: 365,
       type: 'number',
       userCanEdit: false,
