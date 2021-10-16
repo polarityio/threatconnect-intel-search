@@ -48,7 +48,8 @@ module.exports = {
     {
       key: 'url',
       name: 'ThreatConnect Instance URL',
-      description: 'The URL of the ThreatConnect instance you would like to connect to (including http:// or https://). Note the API URL may end with `/api`.',
+      description:
+        'The URL of the ThreatConnect instance you would like to connect to (including http:// or https://). Note the API URL may end with `/api`.',
       default: '',
       type: 'text',
       userCanEdit: false,
@@ -75,7 +76,8 @@ module.exports = {
     {
       key: 'resultLimit',
       name: 'Group Type Result Limit',
-      description: 'For each owner, specify the maximum of number of group objects to return per group type (defaults to 25).',
+      description:
+        'For each owner, specify the maximum of number of group objects to return per group type (defaults to 25).',
       default: 25,
       type: 'number',
       userCanEdit: false,
@@ -232,7 +234,7 @@ module.exports = {
       key: 'maxSearchTermLength',
       name: 'Maximum Search Term Length',
       description:
-          'Search terms over this length will not be searched.  Set to 0 for no search limit.  If you have the "allText" custom entity type enabled you should set a maximum search term length.  (Defaults to 100)',
+        'Search terms over this length will not be searched.  Set to 0 for no search limit.  If you have the "allText" custom entity type enabled you should set a maximum search term length.  (Defaults to 100)',
       default: 100,
       type: 'number',
       userCanEdit: false,

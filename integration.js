@@ -205,12 +205,12 @@ function doLookup(entities, options, cb) {
         const filteredOwners = getFilteredOwners(Object.keys(groupCache), options);
         filteredOwners.forEach((owner) => {
           const groupCacheFiltered = Object.keys(groupCache[owner]).reduce((accum, groupType) => {
-            if(options.validGroupTypes.some((validType) => validType.value === groupType.toLowerCase())){
+            if (options.validGroupTypes.some((validType) => validType.value === groupType.toLowerCase())) {
               // this is a group type that should be searched
               accum[groupType] = groupCache[owner][groupType];
             }
             return accum;
-          }, {})
+          }, {});
           const searchMatches = searchGroups(entity.value.toLowerCase(), groupCacheFiltered);
           let totalGroups = 0;
           const searchMatchesWithLimit = Object.keys(searchMatches).reduce((accum, groupType) => {
@@ -385,11 +385,11 @@ function findGroupsByOwner(owner, options, cb) {
 function searchGroups(searchTerm, groups) {
   let groupMatches = {};
   Object.keys(groups).forEach((groupType) => {
-    const matches = groups[groupType].filter((group) => group.name.toLowerCase().includes(searchTerm))
-    if(matches.length > 0){
+    const matches = groups[groupType].filter((group) => group.name.toLowerCase().includes(searchTerm));
+    if (matches.length > 0) {
       groupMatches[groupType] = matches;
     }
-  })
+  });
 
   return groupMatches;
 }
