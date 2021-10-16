@@ -6,6 +6,7 @@ const fs = require('fs');
 const schedule = require('node-schedule');
 const groupBy = require('lodash.groupby');
 
+const GROUP_CACHE_LIMIT_PER_OWNER = 10000;
 const CRON_ONCE_PER_HOUR = '0 * * * *';
 //const CRON_ONCE_PER_FOUR_HOURS = '0 */4 * * *';
 //const CRON_ONCE_PER_EIGHT_HOURS = '0 */8 * * *';
@@ -351,7 +352,7 @@ function findGroupsByOwner(owner, options, cb) {
   now.setDate(now.getDate() - options.maxLookbackDays);
   const formattedLookback = now.toISOString().split('T')[0];
   const urlPath = tcUrl.pathname.endsWith('/') ? tcUrl.pathname : tcUrl.pathname + '/';
-  const apiPath = `v2/groups/?owner=${encodedOwner}&resultLimit=10000&filters=dateAdded%3E${formattedLookback}`;
+  const apiPath = `v2/groups/?owner=${encodedOwner}&resultLimit=${GROUP_CACHE_LIMIT_PER_OWNER}&filters=dateAdded%3E${formattedLookback}`;
 
   const requestOptions = {
     uri: options.url + apiPath,
