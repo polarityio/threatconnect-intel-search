@@ -267,9 +267,19 @@ function doLookup(entities, options, cb) {
  * @param cb
  */
 function getThreatConnectOwners(options, cb) {
-  const tcUrl = new URL(options.url);
-  const urlPath = tcUrl.pathname.endsWith('/') ? tcUrl.pathname : tcUrl.pathname + '/';
-  options.url = options.url.endsWith('/') ? options.url : options.url + '/';
+  let urlPath;
+
+  if (isValidHttpUrl(options.url)) {
+    const tcUrl = new URL(options.url);
+    urlPath = tcUrl.pathname.endsWith('/') ? tcUrl.pathname : tcUrl.pathname + '/';
+    options.url = options.url.endsWith('/') ? options.url : options.url + '/';
+  } else {
+    return cb({
+      detail: `Not a valid URL, check the URL in the Polarity options.`,
+      body: options.url
+    });
+  }
+
   const requestOptions = {
     uri: options.url + 'v2/owners',
     method: 'GET',
@@ -390,7 +400,7 @@ function searchGroups(searchTerm, groups) {
       groupMatches[groupType] = matches;
     }
   });
-
+  
   return groupMatches;
 }
 
@@ -466,6 +476,18 @@ function createSearchOrgAllowlist(options) {
     });
     return allowlistedOrgs;
   }
+}
+
+function isValidHttpUrl(string) {
+  let url;
+
+  try {
+    url = new URL(string);
+  } catch (_) {
+    return false;
+  }
+
+  return url.protocol === 'http:' || url.protocol === 'https:';
 }
 
 module.exports = {
