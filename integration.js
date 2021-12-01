@@ -4,7 +4,9 @@ const config = require('./config/config');
 const crypto = require('crypto');
 const fs = require('fs');
 const schedule = require('node-schedule');
-const groupBy = require('lodash.groupby');
+const { groupBy } = require('lodash');
+const fp = require('lodash/fp');
+const reduce = require('lodash/fp/reduce').convert({ cap: false });
 
 const GROUP_CACHE_LIMIT_PER_OWNER = 10000;
 const CRON_ONCE_PER_HOUR = '0 * * * *';
@@ -181,6 +183,9 @@ function maybeCacheGroups(options, cb) {
  */
 function doLookup(entities, options, cb) {
   const lookupResults = [];
+  const tcUrl = new URL(options.url);
+  options.urlPath = tcUrl.pathname.endsWith('/') ? tcUrl.pathname : tcUrl.pathname + '/';
+  options.url = options.url.endsWith('/') ? options.url : options.url + '/';
 
   Logger.trace({ entities, options }, 'doLookup');
 
@@ -267,17 +272,16 @@ function doLookup(entities, options, cb) {
  * @param cb
  */
 function getThreatConnectOwners(options, cb) {
-  const tcUrl = new URL(options.url);
-  const urlPath = tcUrl.pathname.endsWith('/') ? tcUrl.pathname : tcUrl.pathname + '/';
-  options.url = options.url.endsWith('/') ? options.url : options.url + '/';
+  
+
   const requestOptions = {
     uri: options.url + 'v2/owners',
     method: 'GET',
-    headers: getHeaders(`${urlPath}v2/owners`, 'GET', options),
+    headers: getHeaders(`${options.urlPath}v2/owners`, 'GET', options),
     json: true
   };
   Logger.trace({ requestOptions }, 'getThreatConnectOwners');
-  request(requestOptions, function (err, response, body) {
+  requestWithDefaults(requestOptions, function (err, response, body) {
     if (err) {
       return cb(err);
     }
@@ -345,24 +349,21 @@ function getGroupsForEachOwner(owners, options, cb) {
  * @param cb
  */
 function findGroupsByOwner(owner, options, cb) {
-  const tcUrl = new URL(options.url);
-  options.url = options.url.endsWith('/') ? options.url : options.url + '/';
-  const encodedOwner = encodeURIComponent(owner.name);
   const now = new Date();
   now.setDate(now.getDate() - options.maxLookbackDays);
   const formattedLookback = now.toISOString().split('T')[0];
-  const urlPath = tcUrl.pathname.endsWith('/') ? tcUrl.pathname : tcUrl.pathname + '/';
+  const encodedOwner = encodeURIComponent(owner.name);
   const apiPath = `v2/groups/?owner=${encodedOwner}&resultLimit=${GROUP_CACHE_LIMIT_PER_OWNER}&filters=dateAdded%3E${formattedLookback}`;
 
   const requestOptions = {
     uri: options.url + apiPath,
     method: 'GET',
-    headers: getHeaders(`${urlPath}${apiPath}`, 'GET', options),
+    headers: getHeaders(`${options.urlPath}${apiPath}`, 'GET', options),
     json: true
   };
   Logger.trace({ requestOptions }, 'findGroupsByOwner');
 
-  request(requestOptions, (err, response, body) => {
+  requestWithDefaults(requestOptions, (err, response, body) => {
     if (err) {
       return cb(err);
     }
@@ -468,7 +469,66 @@ function createSearchOrgAllowlist(options) {
   }
 }
 
+const validateOptions = (options, callback) => {
+  let errors = [];
+  
+  if (options.resultLimit.value < 1) {
+    errors = errors.concat({
+      key: 'resultLimit',
+      message: 'Group Type Result Limit must be 1 or higher'
+    });
+  }
+
+  if (options.maxLookbackDays.value < 1) {
+    errors = errors.concat({
+      key: 'maxLookbackDays',
+      message: 'Max Lookback Days must be 1 or higher'
+    });
+  }
+  if (options.maxSearchTermLength.value < 1) {
+    errors = errors.concat({
+      key: 'maxSearchTermLength',
+      message: 'Maximum Search Term Length must be 0 or higher'
+    });
+  }
+
+  const stringOptionsErrorMessages = {
+    url: 'You must provide a valid ThreatConnect Instance URL',
+    accessId: 'You must provide a valid ThreatConnect Access ID',
+    apiKey: 'You must provide a valid ThreatConnect API Key'
+  };
+
+  errors = _validateStringOptions(stringOptionsErrorMessages, options, errors);
+
+  if (options.url.value) {
+    try {
+      new URL(options.url.value);
+    } catch (_) {
+      errors = errors.concat({
+        key: 'url',
+        message: 'What is currently provided is not a valid URL. You must provide a valid ThreatConnect Instance URL.'
+      });
+    }
+  }
+
+  callback(null, errors);
+};
+
+const _validateStringOptions = (stringOptionsErrorMessages, options, otherErrors = []) =>
+  reduce((agg, message, optionName) => {
+    const isString = typeof options[optionName].value === 'string';
+    const isEmptyString = isString && fp.isEmpty(options[optionName].value);
+
+    return !isString || isEmptyString
+      ? agg.concat({
+          key: optionName,
+          message
+        })
+      : agg;
+  }, otherErrors)(stringOptionsErrorMessages);
+
 module.exports = {
-  doLookup,
-  startup
+  startup,
+  validateOptions,
+  doLookup
 };
