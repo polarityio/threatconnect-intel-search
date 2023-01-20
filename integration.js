@@ -1,4 +1,4 @@
-const request = require('request');
+const request = require('postman-request');
 const async = require('async');
 const config = require('./config/config');
 const crypto = require('crypto');
