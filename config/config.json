@@ -1,4 +1,5 @@
 {
+  "polarityIntegrationUuid": "f9d70680-cce1-11ed-aeee-075d3490155d",
   "name": "ThreatConnect Group Search",
   "acronym": "TCG",
   "description": "Searches ThreatConnect Groups",
