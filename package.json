@@ -1,6 +1,6 @@
 {
   "name": "threatconnect_group_search",
-  "version": "3.5.5",
+  "version": "3.5.6",
   "main": "./integration.js",
   "private": true,
   "dependencies": {
