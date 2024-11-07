@@ -2,7 +2,7 @@ module.exports = {
   name: 'ThreatConnect Group Search',
   acronym: 'TCG',
   description: 'Searches ThreatConnect Groups',
-  entityTypes: ['*'],
+  entityTypes: ['IPv4', 'IPv4CIDR', 'IPv6', 'domain', 'url', 'MD5', 'SHA1', 'SHA256', 'email', 'cve', 'MAC', 'string'],
   customTypes: [
     {
       key: 'allText',
@@ -36,7 +36,7 @@ module.exports = {
     ca: '',
     // An HTTP proxy to be used. Supports proxy Auth with Basic Auth, identical to support for
     // the url parameter (by embedding the auth info in the uri)
-    proxy: ""
+    proxy: ''
   },
   options: [
     {
