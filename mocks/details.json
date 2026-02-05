@@ -1,0 +1,143 @@
+{
+  "resultLimit": 25,
+  "searchResults": {
+    "Common Community": {
+      "groupTypes": {
+        "Report": {
+          "groups": [
+            {
+              "id": 123456,
+              "name": "APT29 Phishing Campaign Q4 2023",
+              "type": "Report",
+              "ownerName": "Common Community",
+              "dateAdded": "2023-10-15T14:32:00Z",
+              "webLink": "https://app.threatconnect.com/auth/report/report.xhtml?report=123456"
+            },
+            {
+              "id": 123457,
+              "name": "Ransomware Trends Analysis October",
+              "type": "Report",
+              "ownerName": "Common Community",
+              "dateAdded": "2023-10-20T09:15:00Z",
+              "webLink": "https://app.threatconnect.com/auth/report/report.xhtml?report=123457"
+            },
+            {
+              "id": 123458,
+              "name": "Cobalt Strike Infrastructure Report",
+              "type": "Report",
+              "ownerName": "Common Community",
+              "dateAdded": "2023-10-25T16:45:00Z",
+              "webLink": "https://app.threatconnect.com/auth/report/report.xhtml?report=123458"
+            }
+          ],
+          "totalGroups": 47
+        },
+        "Incident": {
+          "groups": [
+            {
+              "id": 789012,
+              "name": "Data Exfiltration via Cobalt Strike",
+              "type": "Incident",
+              "ownerName": "Common Community",
+              "dateAdded": "2023-10-18T11:22:00Z",
+              "webLink": "https://app.threatconnect.com/auth/incident/incident.xhtml?incident=789012"
+            },
+            {
+              "id": 789013,
+              "name": "Phishing Attack Against Finance Team",
+              "type": "Incident",
+              "ownerName": "Common Community",
+              "dateAdded": "2023-10-22T08:30:00Z",
+              "webLink": "https://app.threatconnect.com/auth/incident/incident.xhtml?incident=789013"
+            }
+          ],
+          "totalGroups": 12
+        },
+        "Threat": {
+          "groups": [
+            {
+              "id": 345678,
+              "name": "APT29 Threat Profile",
+              "type": "Threat",
+              "ownerName": "Common Community",
+              "dateAdded": "2023-09-05T13:00:00Z",
+              "webLink": "https://app.threatconnect.com/auth/threat/threat.xhtml?threat=345678"
+            }
+          ],
+          "totalGroups": 8
+        }
+      },
+      "totalGroups": 67
+    },
+    "Technical Blogs and Reports": {
+      "groupTypes": {
+        "Report": {
+          "groups": [
+            {
+              "id": 234567,
+              "name": "Emotet Malware Analysis Deep Dive",
+              "type": "Report",
+              "ownerName": "Technical Blogs and Reports",
+              "dateAdded": "2023-10-12T10:20:00Z",
+              "webLink": "https://app.threatconnect.com/auth/report/report.xhtml?report=234567"
+            }
+          ],
+          "totalGroups": 15
+        },
+        "Adversary": {
+          "groups": [
+            {
+              "id": 456789,
+              "name": "APT28 - Fancy Bear",
+              "type": "Adversary",
+              "ownerName": "Technical Blogs and Reports",
+              "dateAdded": "2023-08-30T14:00:00Z",
+              "webLink": "https://app.threatconnect.com/auth/adversary/adversary.xhtml?adversary=456789"
+            },
+            {
+              "id": 456790,
+              "name": "Lazarus Group",
+              "type": "Adversary",
+              "ownerName": "Technical Blogs and Reports",
+              "dateAdded": "2023-09-15T09:30:00Z",
+              "webLink": "https://app.threatconnect.com/auth/adversary/adversary.xhtml?adversary=456790"
+            }
+          ],
+          "totalGroups": 23
+        }
+      },
+      "totalGroups": 38
+    },
+    "Internal Threat Intelligence": {
+      "groupTypes": {
+        "Incident": {
+          "groups": [
+            {
+              "id": 567890,
+              "name": "Suspicious Login Activity - Executive Accounts",
+              "type": "Incident",
+              "ownerName": "Internal Threat Intelligence",
+              "dateAdded": "2023-10-28T07:15:00Z",
+              "webLink": "https://app.threatconnect.com/auth/incident/incident.xhtml?incident=567890"
+            }
+          ],
+          "totalGroups": 5
+        },
+        "Campaign": {
+          "groups": [
+            {
+              "id": 678901,
+              "name": "Q4 2023 Credential Harvesting Campaign",
+              "type": "Campaign",
+              "ownerName": "Internal Threat Intelligence",
+              "dateAdded": "2023-10-01T12:00:00Z",
+              "webLink": "https://app.threatconnect.com/auth/campaign/campaign.xhtml?campaign=678901"
+            }
+          ],
+          "totalGroups": 3
+        }
+      },
+      "totalGroups": 8
+    }
+  }
+}

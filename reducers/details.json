@@ -1,0 +1,44 @@
+{
+  "root": {
+    "path": "",
+    "on_null": "return_empty"
+  },
+  "pipeline": [
+    {
+      "op": "copy",
+      "from": "searchResults",
+      "to": "reduced_results.search_data"
+    },
+    {
+      "op": "project_and_replace",
+      "path": "reduced_results.search_data.*",
+      "keep": [
+        "groupTypes",
+        "totalGroups"
+      ]
+    },
+    {
+      "op": "project_and_replace",
+      "path": "reduced_results.search_data.*.groupTypes.*",
+      "keep": [
+        "groups",
+        "totalGroups"
+      ]
+    },
+    {
+      "op": "project_and_replace",
+      "path": "reduced_results.search_data.*.groupTypes.*.groups[]",
+      "keep": [
+        "name"
+      ]
+    },
+    {
+      "op": "prune",
+      "strategy": "empty_values",
+      "target": "reduced_results"
+    }
+  ],
+  "output": {
+    "result": "$working.reduced_results"
+  }
+}

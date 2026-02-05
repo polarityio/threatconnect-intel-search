@@ -36,7 +36,9 @@
       "file": "./templates/block.hbs"
     }
   },
-  "styles": ["./styles/styles.less"],
+  "styles": [
+    "./styles/styles.less"
+  ],
   "options": [
     {
       "key": "url",
@@ -227,5 +229,10 @@
       "userCanEdit": false,
       "adminOnly": true
     }
-  ]
+  ],
+  "reducer": {
+    "details": {
+      "file": "./reducers/details.json"
+    }
+  }
 }
